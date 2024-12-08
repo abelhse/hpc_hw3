@@ -336,6 +336,13 @@ int main(int argc, char **argv)
             cout << u_true_i << " ";
         }
         cout << endl;
+
+        cout << "x=";
+         for (int i = 1; i <= Nx_global; i++) {
+            double x = 0 + (i-1)*h;
+            cout << x << " ";
+        }
+        cout << endl;
     }
     
     MPI_Finalize();

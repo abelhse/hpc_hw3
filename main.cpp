@@ -34,22 +34,14 @@ int main(int argc, char **argv)
 {
     double u0 = 1;
 
-    // // h = 0.02
-    // double l = 1;
-    // int Nx = 50 + 1;
-    // double h = l / (Nx - 1);
-
-    // // tau = 0.0002
-    // double T = 0.1;
-    // double Nt = 500 + 1;
-    // double tau = T / (Nt - 1);
-
+    // h = 0.02
     double l = 1;
-    int Nx = 200 + 1;
+    int Nx = 50 + 1;
     double h = l / (Nx - 1);
 
+    // tau = 0.0002
     double T = 0.1;
-    double Nt = 10000 + 1;
+    double Nt = 500 + 1;
     double tau = T / (Nt - 1);
 
     double k = 1;

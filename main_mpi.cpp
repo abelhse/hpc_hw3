@@ -45,16 +45,6 @@ int main(int argc, char **argv)
 
     double u0 = 1;
 
-    // // h = 0.02
-    // double l = 1;
-    // int Nx_global = 50 + 1;
-    // double h = l / (Nx_global - 1);
-
-    // // tau = 0.0002
-    // double T = 0.1;
-    // double Nt = 500 + 1;
-    // double tau = T / (Nt - 1);
-
     double l = 1;
     int Nx_global = stoi(argv[3]); 
     double h = l / (Nx_global - 1);
@@ -73,13 +63,6 @@ int main(int argc, char **argv)
     }
     cout << "rank=" << myrank << " Nx=" << Nx << endl; // TODO barrier
 
-    // проверим, что правильно рассчитали размеры блоков
-    int Nx_global_check;
-    MPI_Reduce(&Nx, &Nx_global_check, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-    if (myrank == 0) {
-        assert(Nx_global_check == Nx_global);
-    }
-
     MPI_Barrier(MPI_COMM_WORLD);
 
     vector<double> u(1 + Nx + 1, 1);
@@ -93,13 +76,6 @@ int main(int argc, char **argv)
         u[u.size() - 1] = 0;
         u_new[u_new.size() - 1] = 0;
     }
-    
-    // 1-процессная версия
-    vector<double> ug(1 + Nx_global + 1, 1);
-    vector<double> ug_new(1 + Nx_global + 1, 1);
-    ug[0] = ug[ug.size() - 1] = 0;
-    ug_new[0] = ug_new[ug_new.size() - 1] = 0;
-
 
     for (int j = 0; j < Nt; j++) {
         MPI_Status status;
@@ -135,74 +111,24 @@ int main(int argc, char **argv)
 
         // сравнение Ug и Utrue (соответствует ли многопроцессная версия формуле)
         {
-            double maxAbsErrUandUtrue = 0;
+            double maxAbsErr = 0;
             for (int i = 1; i <= Nx; i++) {
-                // double t = T;
                 double t = j * tau;
-                // double x = 0 + (i-1)*h;
                 double x = h * (myrank*chuck_size + (i-1));
                 double u_true_i = u_true(x, t, k, l, u0, 25);
-                // of_u_true << u_true_i << " ";
-                maxAbsErrUandUtrue = max(maxAbsErrUandUtrue, fabs(u[i] - u_true_i));
+                maxAbsErr = max(maxAbsErr, fabs(u[i] - u_true_i));
             }
-            double maxAbsErrUandUtrueReduced;
-            MPI_Reduce(&maxAbsErrUandUtrue, &maxAbsErrUandUtrueReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+            double maxAbsErrReduced;
+            MPI_Reduce(&maxAbsErr, &maxAbsErrReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
             if (myrank == 0) {
                 if (j % (Nt / 10) == 0) {
                     cout << "j=" << j;
-                    cout << " max|U-Utrue|=" << maxAbsErrUandUtrueReduced;
+                    cout << " max|U-Utrue|=" << maxAbsErrReduced;
                     cout << endl;
                 }
             }
         }
 
-        // расчет 1-проц версии
-        for (int i = 1; i <= Nx_global; i++) {
-            ug_new[i] = ug[i] + (k * tau) / (h * h) * (ug[i+1] - 2*ug[i] + ug[i-1]);
-        }
-        swap(ug, ug_new);
-
-        // сравнение Ug и U (соответствует ли 1-процессная версия многопроцессной)
-        {
-            double maxAbsErrUandUg = 0;
-            for (int i = 1; i <= Nx; i++) {
-                int ig = 1 + myrank*chuck_size + (i-1);
-                maxAbsErrUandUg = max(maxAbsErrUandUg, fabs(u[i] - ug[ig]));
-            }
-            double maxAbsErrUandUgReduced;
-            MPI_Reduce(&maxAbsErrUandUg, &maxAbsErrUandUgReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-            if (myrank == 0) {
-                if (j % (Nt / 10) == 0) {
-                    cout << "j=" << j;
-                    cout << " max|U-Ug|=" << maxAbsErrUandUgReduced;
-                    cout << endl;
-                }
-            }
-        }
-
-        // сравнение Ug и Utrue (соответствует ли 1-процессная версия формуле)
-        // должно быть так же как в (U и Utrue)
-        {
-            double maxAbsErrUgandUtrue = 0;
-            for (int i = 1; i <= Nx; i++) {
-                double t = j * tau;
-                double x = h * (myrank*chuck_size + (i-1));
-                double u_true_i = u_true(x, t, k, l, u0, 25);
-
-                int ig = 1 + myrank*chuck_size + (i-1);
-
-                maxAbsErrUgandUtrue = max(maxAbsErrUgandUtrue, fabs(u_true_i - ug[ig]));
-            }
-            double maxAbsErrUgandUtrueReduced;
-            MPI_Reduce(&maxAbsErrUgandUtrue, &maxAbsErrUgandUtrueReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-            if (myrank == 0) {
-                if (j % (Nt / 10) == 0) {
-                    cout << "j=" << j;
-                    cout << " max|Ug-Utrue|=" << maxAbsErrUgandUtrueReduced;
-                    cout << endl << endl;
-                }
-            }
-        }
     }
     
     MPI_Finalize();

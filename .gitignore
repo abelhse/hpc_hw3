@@ -163,3 +163,6 @@ cython_debug/
 u_true.txt
 a.out
 u.txt
+main_mpi
+test_mpi_sendrecv
+test_mpi_sendrecv.cpp

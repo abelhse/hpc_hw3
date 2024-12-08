@@ -322,6 +322,12 @@ int main(int argc, char **argv)
         cout << "totalTime=" << totalTimeSeconds << endl;
         cout << "algo=" << algo << endl;
 
+        cout << "block_sizes=";
+        for (int i = 0; i < size; i++) {
+            cout << block_sizes[i] << " ";
+        }
+        cout << endl;
+
         cout << "u=";
         for (double ui : u_init) {
             cout << ui << " ";

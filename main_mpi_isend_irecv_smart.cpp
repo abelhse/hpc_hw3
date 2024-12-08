@@ -42,6 +42,7 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    double tik = MPI_Wtime();
 
     double u0 = 1;
 
@@ -61,7 +62,6 @@ int main(int argc, char **argv)
     if (myrank == size-1) { // последний кусочек может быть меньше
         Nx = Nx_global - (size-1) * chuck_size;
     }
-    cout << "rank=" << myrank << " Nx=" << Nx << endl; // TODO barrier
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -147,6 +147,12 @@ int main(int argc, char **argv)
             }
         }
 
+    }
+
+    double tok = MPI_Wtime();
+    double totalTimeSeconds = tok - tik;
+    if (myrank == 0) {
+        cout << "totalTimeSeconds=" << totalTimeSeconds << endl;
     }
     
     MPI_Finalize();

@@ -126,33 +126,31 @@ int main(int argc, char **argv)
         }
 
         swap(u, u_new);
-
-        // сравнение Ug и Utrue (соответствует ли многопроцессная версия формуле)
-        {
-            double maxAbsErr = 0;
-            for (int i = 1; i <= Nx; i++) {
-                double t = j * tau;
-                double x = h * (myrank*chuck_size + (i-1));
-                double u_true_i = u_true(x, t, k, l, u0, 25);
-                maxAbsErr = max(maxAbsErr, fabs(u[i] - u_true_i));
-            }
-            double maxAbsErrReduced;
-            MPI_Reduce(&maxAbsErr, &maxAbsErrReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-            if (myrank == 0) {
-                if (j % (Nt / 10) == 0) {
-                    cout << "j=" << j;
-                    cout << " max|U-Utrue|=" << maxAbsErrReduced;
-                    cout << endl;
-                }
-            }
-        }
-
     }
 
     double tok = MPI_Wtime();
     double totalTimeSeconds = tok - tik;
+
+    // сравнение Ug и Utrue (соответствует ли многопроцессная версия формуле)
+    double maxAbsErr = 0;
+    for (int i = 1; i <= Nx; i++) {
+        double t = T;
+        double x = h * (myrank*chuck_size + (i-1));
+        double u_true_i = u_true(x, t, k, l, u0, 25);
+        maxAbsErr = max(maxAbsErr, fabs(u[i] - u_true_i));
+    }
+    double maxAbsErrReduced;
+    MPI_Reduce(&maxAbsErr, &maxAbsErrReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    
     if (myrank == 0) {
-        cout << "totalTimeSeconds=" << totalTimeSeconds << endl;
+        cout << "maxAbsErr=" << maxAbsErrReduced << endl;
+        cout << "size=" << size << endl;
+        cout << "Nx_global=" << Nx_global << endl;
+        cout << "Nt=" << Nt << endl;
+        cout << "T=" << T << endl;
+        cout << "tau=" << tau << endl;
+        cout << "h=" << h << endl;
+        cout << "totalTime=" << totalTimeSeconds << endl;
     }
     
     MPI_Finalize();

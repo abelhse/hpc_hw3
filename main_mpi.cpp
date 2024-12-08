@@ -205,11 +205,13 @@ int main(int argc, char **argv)
     double k = 1;
 
     // определение размеров блоков
-    int chuck_size = (Nx_global + size - 1) / size;
-    int Nx = chuck_size;
-    if (myrank == size-1) { // последний кусочек может быть меньше
-        Nx = Nx_global - (size-1) * chuck_size; // TODO правильно?
+    vector<int> block_sizes(size);
+    int full_block_size = (Nx_global + size - 1) / size;
+    for (int i = 0; i < size - 1; i++) {
+        block_sizes[i] = full_block_size;
     }
+    block_sizes[size-1] = (Nx_global - (size-1) * full_block_size);
+    int Nx = block_sizes[myrank];
 
     // массивы значений на итерации t и t+1
     vector<double> u(1 + Nx + 1, -228);
@@ -224,16 +226,10 @@ int main(int argc, char **argv)
     }
 
     // пересылка начальных условий
-    vector<int> sendcounts(size);
-    for (int i = 0; i < size - 1; i++) {
-        sendcounts[i] = chuck_size;
-    }
-    sendcounts[size-1] = (Nx_global - (size-1) * chuck_size);
-
     vector<int> displs(size);
     displs[0] = 0;
     for (int i = 1; i < size; i++) {
-        displs.push_back(displs[i-1] + sendcounts[i-1]);
+        displs.push_back(displs[i-1] + block_sizes[i-1]);
     }
 
     vector<double> u_init;
@@ -245,7 +241,7 @@ int main(int argc, char **argv)
     }
 
     MPI_Scatterv(
-        &u_init[0], &sendcounts[0], &displs[0], MPI_DOUBLE,
+        &u_init[0], &block_sizes[0], &displs[0], MPI_DOUBLE,
         &u[1], Nx, MPI_DOUBLE, 0, MPI_COMM_WORLD
     );
 
@@ -271,7 +267,7 @@ int main(int argc, char **argv)
     double maxAbsErr = 0;
     for (int i = 1; i <= Nx; i++) {
         double t = T;
-        double x = h * (myrank*chuck_size + (i-1));
+        double x = h * (myrank*full_block_size + (i-1));
         double u_true_i = u_true(x, t, k, l, u0, 25);
         maxAbsErr = max(maxAbsErr, fabs(u[i] - u_true_i));
     }

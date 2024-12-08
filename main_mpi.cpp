@@ -212,6 +212,14 @@ int main(int argc, char **argv)
     }
     block_sizes[size-1] = (Nx_global - (size-1) * full_block_size);
     int Nx = block_sizes[myrank];
+    // if (myrank == 0) {
+    //     cout << "block_sizes=";
+    //     for (int i = 0; i < size; i++)
+    //     {
+    //         cout << block_sizes[i] << " ";
+    //     }
+    //     cout << endl;
+    // }
 
     // массивы значений на итерации t и t+1
     vector<double> u(1 + Nx + 1, -228);
@@ -229,8 +237,16 @@ int main(int argc, char **argv)
     vector<int> displs(size);
     displs[0] = 0;
     for (int i = 1; i < size; i++) {
-        displs.push_back(displs[i-1] + block_sizes[i-1]);
+        displs[i] = displs[i-1] + block_sizes[i-1];
     }
+    // if (myrank == 0 ) {
+    //     cout << "displs=";
+    //     for (int i = 0; i < size; i++)
+    //     {
+    //         cout << displs[i] << " ";
+    //     }
+    //     cout << endl;
+    // }
 
     vector<double> u_init;
     if (myrank == 0) {
@@ -242,8 +258,21 @@ int main(int argc, char **argv)
 
     MPI_Scatterv(
         &u_init[0], &block_sizes[0], &displs[0], MPI_DOUBLE,
-        &u[1], Nx, MPI_DOUBLE, 0, MPI_COMM_WORLD
+        &u[1], Nx, MPI_DOUBLE,
+        0, MPI_COMM_WORLD
     );
+
+    // for (int i = 0; i < size; i++)
+    // {
+    //     MPI_Barrier(MPI_COMM_WORLD);
+    //     if (myrank == i) {
+    //         cout << "r=" << i << " u=";
+    //         for (auto ui : u) {
+    //             cout << ui << " ";
+    //         }
+    //         cout << endl;
+    //     }
+    // }
 
     // основной цикл
     double tik = MPI_Wtime();
@@ -273,6 +302,29 @@ int main(int argc, char **argv)
     }
     double maxAbsErrReduced;
     MPI_Reduce(&maxAbsErr, &maxAbsErrReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    // собираем все посчитанное на главном процессе
+    MPI_Gatherv(
+        &u[1], Nx, MPI_DOUBLE,
+        &u_init[0], &block_sizes[0], &displs[0], MPI_DOUBLE,
+        0, MPI_COMM_WORLD
+    );
+
+    // root выводит результат в файл
+    if (myrank == 0) {
+        ofstream out("/home/aibelov_1/hpc_hw3/u.txt");
+        for (double ui : u_init) {
+            out << ui << " ";
+        }
+
+        ofstream out_true("/home/aibelov_1/hpc_hw3/u_true.txt");
+        for (int i = 1; i <= Nx_global; i++) {
+            double t = T;
+            double x = 0 + (i-1)*h;
+            double u_true_i = u_true(x, t, k, l, u0, 25);
+            out_true << u_true_i << " ";
+        }
+    }
     
     // печать результатов
     if (myrank == 0) {

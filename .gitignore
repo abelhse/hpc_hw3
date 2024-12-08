@@ -168,3 +168,4 @@ test_mpi_sendrecv
 test_mpi_sendrecv.cpp
 main_mpi_isend_irecv
 main_mpi_isend_irecv_smart
+main_mpi_sendrecv

@@ -179,32 +179,41 @@ void mainloop_isend_irecv_1(int Nt, vector<double> &u, int myrank, int size, int
 
 int main(int argc, char **argv)
 {
+    // инициализация MPI
     int size, myrank;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // определение параметров
-    double u0 = 1;
-    double l = 1;
-    int Nx_global = stoi(argv[3]); 
-    double h = l / (Nx_global - 1);
+    // считывание параметров
     double T = stod(argv[1]);
     int Nt = stoi(argv[2]);
+    int Nx_global = stoi(argv[3]); 
+    int algo = stoi(argv[4]);
+
+    // пересылка параметров на все процессы
+    MPI_Bcast(&T, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&Nt, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&Nx_global, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&algo, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // определение остальных параметров
+    double u0 = 1;
+    double l = 1;
+    double h = l / (Nx_global - 1);
     double tau = T / (Nt - 1);
     double k = 1;
-    string algo = argv[4];
 
-    // размеры блоков
+    // определение размеров блоков
     int chuck_size = (Nx_global + size - 1) / size;
     int Nx = chuck_size;
     if (myrank == size-1) { // последний кусочек может быть меньше
-        Nx = Nx_global - (size-1) * chuck_size;
+        Nx = Nx_global - (size-1) * chuck_size; // TODO правильно?
     }
 
     // массивы значений на итерации t и t+1
-    vector<double> u(1 + Nx + 1, 1);
-    vector<double> u_new(1 + Nx + 1, 1);
+    vector<double> u(1 + Nx + 1, -228);
+    vector<double> u_new(1 + Nx + 1, -228);
     if (myrank == 0) {
         u[0] = 0;
         u_new[0] = 0;
@@ -214,17 +223,43 @@ int main(int argc, char **argv)
         u_new[u_new.size() - 1] = 0;
     }
 
+    // пересылка начальных условий
+    vector<int> sendcounts(size);
+    for (int i = 0; i < size - 1; i++) {
+        sendcounts[i] = chuck_size;
+    }
+    sendcounts[size-1] = (Nx_global - (size-1) * chuck_size);
+
+    vector<int> displs(size);
+    displs[0] = 0;
+    for (int i = 1; i < size; i++) {
+        displs.push_back(displs[i-1] + sendcounts[i-1]);
+    }
+
+    vector<double> u_init;
+    if (myrank == 0) {
+        u_init.resize(Nx_global);
+        for (int i = 0; i < Nx_global; i++) {
+            u_init[i] = 1; // тут можно задать начальное условие
+        }
+    }
+
+    MPI_Scatterv(
+        &u_init[0], &sendcounts[0], &displs[0], MPI_DOUBLE,
+        &u[1], Nx, MPI_DOUBLE, 0, MPI_COMM_WORLD
+    );
+
     // основной цикл
     double tik = MPI_Wtime();
-    if (algo == "isend_irecv_1")
+    if (algo == 0)
         mainloop_isend_irecv_1(Nt, u, myrank, size, Nx, u_new, k, tau, h);
-    else if (algo == "isend_irecv")
+    else if (algo == 1)
         mainloop_isend_irecv(Nt, u, myrank, size, Nx, u_new, k, tau, h);
-    else if (algo == "sendrecv")
+    else if (algo == 2)
         mainloop_sendrecv(Nt, u, myrank, size, Nx, u_new, k, tau, h);
     else {
         if (myrank == 0) {
-            cout << "unknown algorithm " << algo << endl;
+            cout << "unknown algorithm number " << algo << endl;
         }
         MPI_Finalize();
         return -1;

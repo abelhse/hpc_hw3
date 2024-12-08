@@ -170,3 +170,4 @@ main_mpi_isend_irecv
 main_mpi_isend_irecv_smart
 main_mpi_sendrecv
 main_mpi_merged
+*.out

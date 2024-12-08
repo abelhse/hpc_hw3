@@ -122,7 +122,7 @@ void mainloop_isend_irecv(int Nt, vector<double> &u, int myrank, int size, int N
 }
 
 
-void mainloop_isend_irecv_smart(int Nt, vector<double> &u, int myrank, int size, int Nx, vector<double> & u_new, double k, double tau, double h)
+void mainloop_isend_irecv_1(int Nt, vector<double> &u, int myrank, int size, int Nx, vector<double> & u_new, double k, double tau, double h)
 {
     for (int j = 0; j < Nt; j++) {
 
@@ -215,10 +215,9 @@ int main(int argc, char **argv)
     }
 
     // основной цикл
-    using FunctionType = decltype(&mainloop_isend_irecv_smart);
     double tik = MPI_Wtime();
-    if (algo == "isend_irecv_smart")
-        mainloop_isend_irecv_smart(Nt, u, myrank, size, Nx, u_new, k, tau, h);
+    if (algo == "isend_irecv_1")
+        mainloop_isend_irecv_1(Nt, u, myrank, size, Nx, u_new, k, tau, h);
     else if (algo == "isend_irecv")
         mainloop_isend_irecv(Nt, u, myrank, size, Nx, u_new, k, tau, h);
     else if (algo == "sendrecv")

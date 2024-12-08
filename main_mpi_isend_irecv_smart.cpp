@@ -35,48 +35,8 @@ double u_true(
 }
 
 
-int main(int argc, char **argv)
+void mainloop_sendrecv_smart(int Nt, vector<double> &u, int myrank, int size, int Nx, vector<double> & u_new, double k, double tau, double h)
 {
-    int size, myrank;
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    double tik = MPI_Wtime();
-
-    double u0 = 1;
-
-    double l = 1;
-    int Nx_global = stoi(argv[3]); 
-    double h = l / (Nx_global - 1);
-
-    double T = stod(argv[1]);
-    int Nt = stoi(argv[2]);
-    double tau = T / (Nt - 1);
-
-    double k = 1;
-
-    // размеры блоков
-    int chuck_size = (Nx_global + size - 1) / size;
-    int Nx = chuck_size;
-    if (myrank == size-1) { // последний кусочек может быть меньше
-        Nx = Nx_global - (size-1) * chuck_size;
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    vector<double> u(1 + Nx + 1, 1);
-    vector<double> u_new(1 + Nx + 1, 1);
-    if (myrank == 0) {
-        u[0] = 0;
-        u_new[0] = 0;
-    }
-
-    if (myrank == size - 1) {
-        u[u.size() - 1] = 0;
-        u_new[u_new.size() - 1] = 0;
-    }
-
     for (int j = 0; j < Nt; j++) {
 
         // делаем асинхронный запрос на обмен концами
@@ -127,11 +87,52 @@ int main(int argc, char **argv)
 
         swap(u, u_new);
     }
+}
 
+
+int main(int argc, char **argv)
+{
+    int size, myrank;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    // определение параметров
+    double u0 = 1;
+    double l = 1;
+    int Nx_global = stoi(argv[3]); 
+    double h = l / (Nx_global - 1);
+    double T = stod(argv[1]);
+    int Nt = stoi(argv[2]);
+    double tau = T / (Nt - 1);
+    double k = 1;
+
+    // размеры блоков
+    int chuck_size = (Nx_global + size - 1) / size;
+    int Nx = chuck_size;
+    if (myrank == size-1) { // последний кусочек может быть меньше
+        Nx = Nx_global - (size-1) * chuck_size;
+    }
+
+    // массивы значений на итерации t и t+1
+    vector<double> u(1 + Nx + 1, 1);
+    vector<double> u_new(1 + Nx + 1, 1);
+    if (myrank == 0) {
+        u[0] = 0;
+        u_new[0] = 0;
+    }
+    if (myrank == size - 1) {
+        u[u.size() - 1] = 0;
+        u_new[u_new.size() - 1] = 0;
+    }
+
+    // основной цикл
+    double tik = MPI_Wtime();
+    mainloop_sendrecv_smart(Nt, u, myrank, size, Nx, u_new, k, tau, h);
     double tok = MPI_Wtime();
     double totalTimeSeconds = tok - tik;
 
-    // сравнение Ug и Utrue (соответствует ли многопроцессная версия формуле)
+    // сравнение численных результатов с формулой
     double maxAbsErr = 0;
     for (int i = 1; i <= Nx; i++) {
         double t = T;
@@ -142,6 +143,7 @@ int main(int argc, char **argv)
     double maxAbsErrReduced;
     MPI_Reduce(&maxAbsErr, &maxAbsErrReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
     
+    // печать результатов
     if (myrank == 0) {
         cout << "maxAbsErr=" << maxAbsErrReduced << endl;
         cout << "size=" << size << endl;

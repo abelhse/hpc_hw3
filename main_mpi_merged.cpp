@@ -3,6 +3,8 @@
 #include <vector>
 #include <fstream>
 #include <cassert>
+#include <string>
+#include <stdexcept>
 
 #include <mpi.h>
 
@@ -12,6 +14,7 @@ using std::swap;
 using std::vector;
 using std::max;
 using std::stoi;
+using std::string;
 using std::stod;
 using std::ofstream;
 
@@ -35,7 +38,91 @@ double u_true(
 }
 
 
-void mainloop_sendrecv_smart(int Nt, vector<double> &u, int myrank, int size, int Nx, vector<double> & u_new, double k, double tau, double h)
+void mainloop_sendrecv(int Nt, vector<double> &u, int myrank, int size, int Nx, vector<double> & u_new, double k, double tau, double h)
+{
+    for (int j = 0; j < Nt; j++) {
+        MPI_Status status;
+
+        // >
+        MPI_Sendrecv(
+            &u[u.size() - 2], 1, MPI_DOUBLE, (myrank+1 + size)%size, 0,
+            &u[0], 1, MPI_DOUBLE, (myrank-1 + size)%size, 0,
+            MPI_COMM_WORLD, &status
+        );
+
+        // <
+        MPI_Sendrecv(
+            &u[1], 1, MPI_DOUBLE, (myrank-1 + size)%size, 1,
+            &u[u.size() - 1], 1, MPI_DOUBLE, (myrank+1 + size)%size, 1,
+            MPI_COMM_WORLD, &status
+        );
+
+        if (myrank == 0) {
+            u[0] = 0;
+            u_new[0] = 0;
+        }
+
+        if (myrank == size - 1) {
+            u[u.size() - 1] = 0;
+            u_new[u_new.size() - 1] = 0;
+        }
+
+        for (int i = 1; i <= Nx; i++) {
+            u_new[i] = u[i] + (k * tau) / (h * h) * (u[i+1] - 2*u[i] + u[i-1]);
+        }
+        swap(u, u_new);
+    }
+}
+
+
+void mainloop_isend_irecv(int Nt, vector<double> &u, int myrank, int size, int Nx, vector<double> & u_new, double k, double tau, double h)
+{
+    for (int j = 0; j < Nt; j++) {
+
+        MPI_Request req[4];
+
+        // >
+        MPI_Isend(
+            &u[u.size() - 2], 1, MPI_DOUBLE, (myrank+1 + size)%size, 0,
+            MPI_COMM_WORLD, &req[0]
+        );
+        MPI_Irecv(
+            &u[0], 1, MPI_DOUBLE, (myrank-1 + size)%size, 0,
+            MPI_COMM_WORLD, &req[1]
+        );
+
+        // <
+        MPI_Isend(
+            &u[1], 1, MPI_DOUBLE, (myrank-1 + size)%size, 1,
+            MPI_COMM_WORLD, &req[2]
+        );
+        MPI_Irecv(
+            &u[u.size() - 1], 1, MPI_DOUBLE, (myrank+1 + size)%size, 1,
+            MPI_COMM_WORLD, &req[3]
+        );
+
+        MPI_Status statuses[4];
+        MPI_Waitall(4, req, statuses);
+
+        if (myrank == 0) {
+            u[0] = 0;
+            u_new[0] = 0;
+        }
+
+        if (myrank == size - 1) {
+            u[u.size() - 1] = 0;
+            u_new[u_new.size() - 1] = 0;
+        }
+
+        for (int i = 1; i <= Nx; i++) {
+            u_new[i] = u[i] + (k * tau) / (h * h) * (u[i+1] - 2*u[i] + u[i-1]);
+        }
+        swap(u, u_new);
+    }
+}
+
+
+void mainloop_isend_irecv_smart(int Nt, vector<double> &u, int myrank, int size, int Nx, vector<double> & u_new, double k, double tau, double h)
 {
     for (int j = 0; j < Nt; j++) {
 
@@ -106,6 +193,7 @@ int main(int argc, char **argv)
     int Nt = stoi(argv[2]);
     double tau = T / (Nt - 1);
     double k = 1;
+    string algo = argv[4];
 
     // размеры блоков
     int chuck_size = (Nx_global + size - 1) / size;
@@ -127,8 +215,21 @@ int main(int argc, char **argv)
     }
 
     // основной цикл
+    using FunctionType = decltype(&mainloop_isend_irecv_smart);
     double tik = MPI_Wtime();
-    mainloop_sendrecv_smart(Nt, u, myrank, size, Nx, u_new, k, tau, h);
+    if (algo == "isend_irecv_smart")
+        mainloop_isend_irecv_smart(Nt, u, myrank, size, Nx, u_new, k, tau, h);
+    else if (algo == "isend_irecv")
+        mainloop_isend_irecv(Nt, u, myrank, size, Nx, u_new, k, tau, h);
+    else if (algo == "sendrecv")
+        mainloop_sendrecv(Nt, u, myrank, size, Nx, u_new, k, tau, h);
+    else {
+        if (myrank == 0) {
+            cout << "unknown algorithm " << algo << endl;
+        }
+        MPI_Finalize();
+        return -1;
+    }
     double tok = MPI_Wtime();
     double totalTimeSeconds = tok - tik;
 
@@ -153,6 +254,7 @@ int main(int argc, char **argv)
         cout << "tau=" << tau << endl;
         cout << "h=" << h << endl;
         cout << "totalTime=" << totalTimeSeconds << endl;
+        cout << "algo=" << algo << endl;
     }
     
     MPI_Finalize();

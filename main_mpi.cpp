@@ -11,6 +11,8 @@ using std::cout;
 using std::swap;
 using std::vector;
 using std::max;
+using std::stoi;
+using std::stod;
 using std::ofstream;
 
 
@@ -53,12 +55,12 @@ int main(int argc, char **argv)
     // double Nt = 500 + 1;
     // double tau = T / (Nt - 1);
 
-     double l = 1;
-    int Nx_global = 200 + 1;
+    double l = 1;
+    int Nx_global = stoi(argv[3]); 
     double h = l / (Nx_global - 1);
 
-    double T = 0.1;
-    double Nt = 10000 + 1;
+    double T = stod(argv[1]);
+    int Nt = stoi(argv[2]);
     double tau = T / (Nt - 1);
 
     double k = 1;
@@ -146,7 +148,7 @@ int main(int argc, char **argv)
             double maxAbsErrUandUtrueReduced;
             MPI_Reduce(&maxAbsErrUandUtrue, &maxAbsErrUandUtrueReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
             if (myrank == 0) {
-                if (j % 1000 == 0) {
+                if (j % (Nt / 10) == 0) {
                     cout << "j=" << j;
                     cout << " max|U-Utrue|=" << maxAbsErrUandUtrueReduced;
                     cout << endl;
@@ -170,7 +172,7 @@ int main(int argc, char **argv)
             double maxAbsErrUandUgReduced;
             MPI_Reduce(&maxAbsErrUandUg, &maxAbsErrUandUgReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
             if (myrank == 0) {
-                if (j % 1000 == 0) {
+                if (j % (Nt / 10) == 0) {
                     cout << "j=" << j;
                     cout << " max|U-Ug|=" << maxAbsErrUandUgReduced;
                     cout << endl;
@@ -194,7 +196,7 @@ int main(int argc, char **argv)
             double maxAbsErrUgandUtrueReduced;
             MPI_Reduce(&maxAbsErrUgandUtrue, &maxAbsErrUgandUtrueReduced, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
             if (myrank == 0) {
-                if (j % 1000 == 0) {
+                if (j % (Nt / 10) == 0) {
                     cout << "j=" << j;
                     cout << " max|Ug-Utrue|=" << maxAbsErrUgandUtrueReduced;
                     cout << endl << endl;

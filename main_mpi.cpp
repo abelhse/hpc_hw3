@@ -310,22 +310,6 @@ int main(int argc, char **argv)
         0, MPI_COMM_WORLD
     );
 
-    // root выводит результат в файл
-    if (myrank == 0) {
-        ofstream out("/home/aibelov_1/hpc_hw3/u.txt");
-        for (double ui : u_init) {
-            out << ui << " ";
-        }
-
-        ofstream out_true("/home/aibelov_1/hpc_hw3/u_true.txt");
-        for (int i = 1; i <= Nx_global; i++) {
-            double t = T;
-            double x = 0 + (i-1)*h;
-            double u_true_i = u_true(x, t, k, l, u0, 25);
-            out_true << u_true_i << " ";
-        }
-    }
-    
     // печать результатов
     if (myrank == 0) {
         cout << "maxAbsErr=" << maxAbsErrReduced << endl;
@@ -337,6 +321,21 @@ int main(int argc, char **argv)
         cout << "h=" << h << endl;
         cout << "totalTime=" << totalTimeSeconds << endl;
         cout << "algo=" << algo << endl;
+
+        cout << "u=";
+        for (double ui : u_init) {
+            cout << ui << " ";
+        }
+        cout << endl;
+
+        cout << "u_true=";
+        for (int i = 1; i <= Nx_global; i++) {
+            double t = T;
+            double x = 0 + (i-1)*h;
+            double u_true_i = u_true(x, t, k, l, u0, 25);
+            cout << u_true_i << " ";
+        }
+        cout << endl;
     }
     
     MPI_Finalize();

@@ -30,8 +30,8 @@ double u_true(
 {
     double u = 0;
     for (int m = 0; m <= M; m++) {
-        float c0 = M_PI * (2*m + 1) / l;
-        float c1 = exp(-k * t * c0 * c0) / (2*m + 1);
+        double c0 = M_PI * (2*m + 1) / l;
+        double c1 = exp(-k * t * c0 * c0) / (2*m + 1);
         u += (4 * u0 / M_PI) * c1 * sin(c0 * x);
     }
     return u;
@@ -212,14 +212,6 @@ int main(int argc, char **argv)
     }
     block_sizes[size-1] = (Nx_global - (size-1) * full_block_size);
     int Nx = block_sizes[myrank];
-    // if (myrank == 0) {
-    //     cout << "block_sizes=";
-    //     for (int i = 0; i < size; i++)
-    //     {
-    //         cout << block_sizes[i] << " ";
-    //     }
-    //     cout << endl;
-    // }
 
     // массивы значений на итерации t и t+1
     vector<double> u(1 + Nx + 1, -228);
@@ -239,14 +231,6 @@ int main(int argc, char **argv)
     for (int i = 1; i < size; i++) {
         displs[i] = displs[i-1] + block_sizes[i-1];
     }
-    // if (myrank == 0 ) {
-    //     cout << "displs=";
-    //     for (int i = 0; i < size; i++)
-    //     {
-    //         cout << displs[i] << " ";
-    //     }
-    //     cout << endl;
-    // }
 
     vector<double> u_init;
     if (myrank == 0) {
@@ -261,18 +245,6 @@ int main(int argc, char **argv)
         &u[1], Nx, MPI_DOUBLE,
         0, MPI_COMM_WORLD
     );
-
-    // for (int i = 0; i < size; i++)
-    // {
-    //     MPI_Barrier(MPI_COMM_WORLD);
-    //     if (myrank == i) {
-    //         cout << "r=" << i << " u=";
-    //         for (auto ui : u) {
-    //             cout << ui << " ";
-    //         }
-    //         cout << endl;
-    //     }
-    // }
 
     // основной цикл
     double tik = MPI_Wtime();
